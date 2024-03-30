@@ -43,8 +43,10 @@ framebuffer_size_callback(GLFWwindow *window, int width, int height)
   glViewport(0, 0, width, height);
 }
 
-#define GRID_X_COUNT 8
-#define GRID_Y_COUNT 6
+#define GRID_X_COUNT (8 * 2)
+#define GRID_Y_COUNT (6 * 2)
+
+#define GRID_MARGIN 0.92
 
 #define GRID_QUAD_COUNT (GRID_X_COUNT * GRID_Y_COUNT)
 
@@ -130,12 +132,20 @@ main(void)
     glDeleteShader(fragment_shader);
   }
 
+  {
+    GLint screen_loc = glGetUniformLocation(program, "screen");
+    assert(screen_loc != -1);
+
+    glUseProgram(program);
+    glUniform2f(screen_loc, SCREEN_WIDTH, SCREEN_HEIGHT);
+  }
+
   GLint transform_loc = glGetUniformLocation(program, "transform");
   assert(transform_loc != -1);
 
   {
     float matrix[3][2] = {
-      { 0.9 * 2.0 / GRID_X_COUNT, 0 }, { 0, 0.9 * 2.0 / GRID_Y_COUNT }, { -1 + 0.05 * 2.0 / GRID_X_COUNT, -1 + 0.05 * 2.0 / GRID_Y_COUNT }, };
+      { GRID_MARGIN * 2.0 / GRID_X_COUNT, 0 }, { 0, GRID_MARGIN * 2.0 / GRID_Y_COUNT }, { -1 + (1 - GRID_MARGIN) / 2 * 2.0 / GRID_X_COUNT, -1 + (1 - GRID_MARGIN) / 2 * 2.0 / GRID_Y_COUNT }, };
 
     glUseProgram(program);
     glUniformMatrix3x2fv(transform_loc, 1, GL_FALSE, (float *)matrix);
@@ -144,7 +154,7 @@ main(void)
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   glEnable(GL_DEPTH_TEST);
-  glClearColor(0.8, 0.0, 0.4, 1.0);
+  glClearColor(1.0, 1.0, 1.0, 1.0);
 
   for (GLenum error; (error = glGetError()) != GL_NO_ERROR; )
     {

@@ -3,6 +3,7 @@
 layout (location = 0) in vec2 vpos;
 layout (location = 1) in vec2 voffset;
 
+uniform vec2 screen;
 uniform mat3x2 transform;
 
 void
