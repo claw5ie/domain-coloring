@@ -43,6 +43,11 @@ framebuffer_size_callback(GLFWwindow *window, int width, int height)
   glViewport(0, 0, width, height);
 }
 
+#define GRID_X_COUNT 8
+#define GRID_Y_COUNT 6
+
+#define GRID_QUAD_COUNT (GRID_X_COUNT * GRID_Y_COUNT)
+
 int
 main(void)
 {
@@ -67,32 +72,73 @@ main(void)
 
   glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
-  float triangle[] = { 0.0, 0.0,
-                       1.0, 0.0,
-                       0.0, 1.0 };
+  float quad[] = { 0, 0,
+                   1, 0,
+                   0, 1,
+                   1, 1 };
 
-  GLuint vertex_buffer;
-  glCreateBuffers(1, &vertex_buffer);
-  glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(triangle), triangle, GL_STATIC_DRAW);
+  GLuint quad_array;
+  glCreateVertexArrays(1, &quad_array);
 
-  GLuint vertex_array;
-  glCreateVertexArrays(1, &vertex_array);
-  glBindVertexArray(vertex_array);
+  GLuint quad_buffer;
+  glCreateBuffers(1, &quad_buffer);
+  glBindBuffer(GL_ARRAY_BUFFER, quad_buffer);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
 
-  glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+  GLuint offset_buffer;
+  glCreateBuffers(1, &offset_buffer);
+  glBindBuffer(GL_ARRAY_BUFFER, offset_buffer);
+  glBufferData(GL_ARRAY_BUFFER, GRID_QUAD_COUNT * 2 * sizeof(float), NULL, GL_DYNAMIC_DRAW);
+
+  {
+    float *offsets = glMapBuffer(GL_ARRAY_BUFFER, GL_READ_WRITE);
+    assert(offsets);
+
+    for (size_t i = 0, k = 0; i < GRID_Y_COUNT; i++)
+      {
+        float y = i * 2.0 / GRID_Y_COUNT;
+        for (size_t j = 0; j < GRID_X_COUNT; j++, k += 2)
+          {
+            float x = j * 2.0 / GRID_X_COUNT;
+            offsets[k + 0] = x;
+            offsets[k + 1] = y;
+          }
+      }
+
+    assert(glUnmapBuffer(GL_ARRAY_BUFFER));
+  }
+
+  glBindVertexArray(quad_array);
+
+  glBindBuffer(GL_ARRAY_BUFFER, quad_buffer);
   glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void *)0);
   glEnableVertexAttribArray(0);
+
+  glBindBuffer(GL_ARRAY_BUFFER, offset_buffer);
+  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, (void *)0);
+  glEnableVertexAttribArray(1);
+  glVertexAttribDivisor(1, 1);
 
   GLuint program = 0;
 
   {
-    GLuint vertex_shader = create_shader(GL_VERTEX_SHADER, "./shaders/shader.vert");
-    GLuint fragment_shader = create_shader(GL_FRAGMENT_SHADER, "./shaders/shader.frag");
+    GLuint vertex_shader = create_shader(GL_VERTEX_SHADER, "./shaders/grid.vert");
+    GLuint fragment_shader = create_shader(GL_FRAGMENT_SHADER, "./shaders/default.frag");
     program = create_program(vertex_shader, fragment_shader);
 
     glDeleteShader(vertex_shader);
     glDeleteShader(fragment_shader);
+  }
+
+  GLint transform_loc = glGetUniformLocation(program, "transform");
+  assert(transform_loc != -1);
+
+  {
+    float matrix[3][2] = {
+      { 0.9 * 2.0 / GRID_X_COUNT, 0 }, { 0, 0.9 * 2.0 / GRID_Y_COUNT }, { -1 + 0.05 * 2.0 / GRID_X_COUNT, -1 + 0.05 * 2.0 / GRID_Y_COUNT }, };
+
+    glUseProgram(program);
+    glUniformMatrix3x2fv(transform_loc, 1, GL_FALSE, (float *)matrix);
   }
 
   glEnable(GL_BLEND);
@@ -142,9 +188,9 @@ main(void)
       if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
-      glBindVertexArray(vertex_array);
+      glBindVertexArray(quad_array);
       glUseProgram(program);
-      glDrawArrays(GL_TRIANGLES, 0, 3);
+      glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, GRID_QUAD_COUNT);
 
       glfwSwapBuffers(window);
       glfwPollEvents();
