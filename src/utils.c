@@ -63,7 +63,8 @@ create_shader(GLenum shader_type, const char *filepath)
         = shader_type == GL_VERTEX_SHADER ? "vertex" : "fragment";
       if (info_log_length <= 0)
         fprintf(stderr,
-                "ERROR: can't compile %s shader: no error message from OpenGL.\n",
+                "%s: error: can't compile %s shader: no error message from OpenGL.\n",
+                filepath,
                 shader_type_as_string);
       else
         {
@@ -73,7 +74,8 @@ create_shader(GLenum shader_type, const char *filepath)
           glGetShaderInfoLog(shader, info_log_length, NULL, error_message);
           error_message[info_log_length] = '\0';
           fprintf(stderr,
-                  "ERROR: can't compile %s shader:\n%s",
+                  "%s: error: can't compile %s shader:\n%s",
+                  filepath,
                   shader_type_as_string,
                   error_message);
           free(error_message);

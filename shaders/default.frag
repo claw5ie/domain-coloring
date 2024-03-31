@@ -3,6 +3,8 @@
 layout (location = 0) out vec4 frag_color;
 
 uniform vec2 screen;
+uniform vec2 x_axis;
+uniform vec2 y_axis;
 
 #define M_PI 3.1415926535897932384626433832795
 
@@ -25,15 +27,23 @@ color_point(float angle)
     }
 }
 
+vec2
+func(vec2 pos)
+{
+  return vec2(sin(pos.x * pos.x - pos.y * pos.y), 2 * pos.x * pos.y);
+}
+
 void
 main()
 {
   vec2 pos = gl_FragCoord.xy;
 
   pos /= screen;
-  pos *= 2.0;
-  pos += vec2(-1.0, -1.0);
+  pos *= y_axis - x_axis;
   pos.y = -pos.y;
+  pos += vec2(x_axis.x, y_axis.y);
+
+  pos = func(pos);
 
   float angle = atan(pos.y, pos.x);
   if (angle < 0)

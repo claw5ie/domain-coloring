@@ -36,19 +36,22 @@ typedef double f64;
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
 
+#define LEFT (-8.0)
+#define RIGHT 8.0
+#define BOTTOM (-6.0)
+#define TOP 6.0
+
+#define GRID_X_COUNT (8 * 2)
+#define GRID_Y_COUNT (6 * 2)
+
+#define GRID_QUAD_COUNT (GRID_X_COUNT * GRID_Y_COUNT)
+
 void
 framebuffer_size_callback(GLFWwindow *window, int width, int height)
 {
   (void)window;
   glViewport(0, 0, width, height);
 }
-
-#define GRID_X_COUNT (8 * 2)
-#define GRID_Y_COUNT (6 * 2)
-
-#define GRID_MARGIN 0.92
-
-#define GRID_QUAD_COUNT (GRID_X_COUNT * GRID_Y_COUNT)
 
 int
 main(void)
@@ -98,10 +101,10 @@ main(void)
 
     for (size_t i = 0, k = 0; i < GRID_Y_COUNT; i++)
       {
-        float y = i * 2.0 / GRID_Y_COUNT;
+        float y = i * (TOP - BOTTOM) / GRID_Y_COUNT;
         for (size_t j = 0; j < GRID_X_COUNT; j++, k += 2)
           {
-            float x = j * 2.0 / GRID_X_COUNT;
+            float x = j * (RIGHT - LEFT) / GRID_X_COUNT;
             offsets[k + 0] = x;
             offsets[k + 1] = y;
           }
@@ -134,21 +137,41 @@ main(void)
 
   {
     GLint screen_loc = glGetUniformLocation(program, "screen");
+    GLint x_axis_loc = glGetUniformLocation(program, "x_axis");
+    GLint y_axis_loc = glGetUniformLocation(program, "y_axis");
+    GLint transform_loc = glGetUniformLocation(program, "transform");
+    GLint projection_loc = glGetUniformLocation(program, "projection");
+
     assert(screen_loc != -1);
+    assert(x_axis_loc != -1);
+    assert(y_axis_loc != -1);
+    assert(transform_loc != -1);
+    assert(projection_loc != -1);
 
     glUseProgram(program);
     glUniform2f(screen_loc, SCREEN_WIDTH, SCREEN_HEIGHT);
-  }
+    glUniform2f(x_axis_loc, LEFT, BOTTOM);
+    glUniform2f(y_axis_loc, RIGHT, TOP);
 
-  GLint transform_loc = glGetUniformLocation(program, "transform");
-  assert(transform_loc != -1);
+    {
+      float matrix[4][4] = {
+        { (RIGHT - LEFT) / GRID_X_COUNT, 0, 0, 0 },
+        { 0, (TOP - BOTTOM) / GRID_Y_COUNT, 0, 0 },
+        { 0, 0, 1, 0 },
+        { LEFT, BOTTOM, 0, 1 },
+      };
+      glUniformMatrix4fv(transform_loc, 1, GL_FALSE, (float *)matrix);
+    }
 
-  {
-    float matrix[3][2] = {
-      { GRID_MARGIN * 2.0 / GRID_X_COUNT, 0 }, { 0, GRID_MARGIN * 2.0 / GRID_Y_COUNT }, { -1 + (1 - GRID_MARGIN) / 2 * 2.0 / GRID_X_COUNT, -1 + (1 - GRID_MARGIN) / 2 * 2.0 / GRID_Y_COUNT }, };
-
-    glUseProgram(program);
-    glUniformMatrix3x2fv(transform_loc, 1, GL_FALSE, (float *)matrix);
+    {
+      float matrix[4][4] = {
+        { 2.0 / (RIGHT - LEFT), 0, 0, 0 },
+        { 0, 2.0 / (TOP - BOTTOM), 0, 0 },
+        { 0, 0, 1, 0 },
+        { -(RIGHT + LEFT) / (RIGHT - LEFT), -(TOP + BOTTOM) / (TOP - BOTTOM), 0, 1 },
+      };
+      glUniformMatrix4fv(projection_loc, 1, GL_FALSE, (float *)matrix);
+    }
   }
 
   glEnable(GL_BLEND);
