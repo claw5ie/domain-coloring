@@ -33,24 +33,37 @@ typedef double f64;
 
 #include "utils.c"
 
-#define SCREEN_WIDTH 800
-#define SCREEN_HEIGHT 600
+int SCREEN_WIDTH = 800;
+int SCREEN_HEIGHT = 600;
 
-#define LEFT (-8.0)
-#define RIGHT 8.0
-#define BOTTOM (-6.0)
-#define TOP 6.0
+float LEFT = (-8.0);
+float RIGHT = 8.0;
+float BOTTOM = (-6.0);
+float TOP = 6.0;
 
-#define GRID_X_COUNT (8 * 2)
-#define GRID_Y_COUNT (6 * 2)
-
-#define GRID_QUAD_COUNT (GRID_X_COUNT * GRID_Y_COUNT)
+bool should_update_framebuffer = true;
 
 void
 framebuffer_size_callback(GLFWwindow *window, int width, int height)
 {
   (void)window;
+
+  float scale = (RIGHT - LEFT) / (TOP - BOTTOM) * ((float)height / width);
+  float offset = (TOP + BOTTOM) / 2;
+
+  BOTTOM -= offset;
+  TOP -= offset;
+  BOTTOM *= scale;
+  TOP *= scale;
+  BOTTOM += offset;
+  TOP += offset;
+
+  SCREEN_WIDTH = width;
+  SCREEN_HEIGHT = height;
+
   glViewport(0, 0, width, height);
+
+  should_update_framebuffer = true;
 }
 
 int
@@ -90,44 +103,16 @@ main(void)
   glBindBuffer(GL_ARRAY_BUFFER, quad_buffer);
   glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
 
-  GLuint offset_buffer;
-  glCreateBuffers(1, &offset_buffer);
-  glBindBuffer(GL_ARRAY_BUFFER, offset_buffer);
-  glBufferData(GL_ARRAY_BUFFER, GRID_QUAD_COUNT * 2 * sizeof(float), NULL, GL_DYNAMIC_DRAW);
-
-  {
-    float *offsets = glMapBuffer(GL_ARRAY_BUFFER, GL_READ_WRITE);
-    assert(offsets);
-
-    for (size_t i = 0, k = 0; i < GRID_Y_COUNT; i++)
-      {
-        float y = i * (TOP - BOTTOM) / GRID_Y_COUNT;
-        for (size_t j = 0; j < GRID_X_COUNT; j++, k += 2)
-          {
-            float x = j * (RIGHT - LEFT) / GRID_X_COUNT;
-            offsets[k + 0] = x;
-            offsets[k + 1] = y;
-          }
-      }
-
-    assert(glUnmapBuffer(GL_ARRAY_BUFFER));
-  }
-
   glBindVertexArray(quad_array);
 
   glBindBuffer(GL_ARRAY_BUFFER, quad_buffer);
   glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void *)0);
   glEnableVertexAttribArray(0);
 
-  glBindBuffer(GL_ARRAY_BUFFER, offset_buffer);
-  glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, (void *)0);
-  glEnableVertexAttribArray(1);
-  glVertexAttribDivisor(1, 1);
-
   GLuint program = 0;
 
   {
-    GLuint vertex_shader = create_shader(GL_VERTEX_SHADER, "./shaders/grid.vert");
+    GLuint vertex_shader = create_shader(GL_VERTEX_SHADER, "./shaders/default.vert");
     GLuint fragment_shader = create_shader(GL_FRAGMENT_SHADER, "./shaders/default.frag");
     program = create_program(vertex_shader, fragment_shader);
 
@@ -135,44 +120,17 @@ main(void)
     glDeleteShader(fragment_shader);
   }
 
-  {
-    GLint screen_loc = glGetUniformLocation(program, "screen");
-    GLint x_axis_loc = glGetUniformLocation(program, "x_axis");
-    GLint y_axis_loc = glGetUniformLocation(program, "y_axis");
-    GLint transform_loc = glGetUniformLocation(program, "transform");
-    GLint projection_loc = glGetUniformLocation(program, "projection");
+  GLint screen_loc = glGetUniformLocation(program, "screen");
+  GLint x_axis_loc = glGetUniformLocation(program, "x_axis");
+  GLint y_axis_loc = glGetUniformLocation(program, "y_axis");
+  GLint transform_loc = glGetUniformLocation(program, "transform");
+  GLint projection_loc = glGetUniformLocation(program, "projection");
 
-    assert(screen_loc != -1);
-    assert(x_axis_loc != -1);
-    assert(y_axis_loc != -1);
-    assert(transform_loc != -1);
-    assert(projection_loc != -1);
-
-    glUseProgram(program);
-    glUniform2f(screen_loc, SCREEN_WIDTH, SCREEN_HEIGHT);
-    glUniform2f(x_axis_loc, LEFT, BOTTOM);
-    glUniform2f(y_axis_loc, RIGHT, TOP);
-
-    {
-      float matrix[4][4] = {
-        { (RIGHT - LEFT) / GRID_X_COUNT, 0, 0, 0 },
-        { 0, (TOP - BOTTOM) / GRID_Y_COUNT, 0, 0 },
-        { 0, 0, 1, 0 },
-        { LEFT, BOTTOM, 0, 1 },
-      };
-      glUniformMatrix4fv(transform_loc, 1, GL_FALSE, (float *)matrix);
-    }
-
-    {
-      float matrix[4][4] = {
-        { 2.0 / (RIGHT - LEFT), 0, 0, 0 },
-        { 0, 2.0 / (TOP - BOTTOM), 0, 0 },
-        { 0, 0, 1, 0 },
-        { -(RIGHT + LEFT) / (RIGHT - LEFT), -(TOP + BOTTOM) / (TOP - BOTTOM), 0, 1 },
-      };
-      glUniformMatrix4fv(projection_loc, 1, GL_FALSE, (float *)matrix);
-    }
-  }
+  assert(screen_loc != -1);
+  assert(x_axis_loc != -1);
+  assert(y_axis_loc != -1);
+  assert(transform_loc != -1);
+  assert(projection_loc != -1);
 
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -221,9 +179,40 @@ main(void)
       if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
+      if (should_update_framebuffer)
+        {
+          glUseProgram(program);
+
+          glUniform2f(screen_loc, SCREEN_WIDTH, SCREEN_HEIGHT);
+          glUniform2f(x_axis_loc, LEFT, BOTTOM);
+          glUniform2f(y_axis_loc, RIGHT, TOP);
+
+          {
+            float matrix[4][4] = {
+              { fabsf(RIGHT - LEFT), 0, 0, 0 },
+              { 0, fabsf(TOP - BOTTOM), 0, 0 },
+              { 0, 0, 1, 0 },
+              { LEFT, BOTTOM, 0, 1 },
+            };
+            glUniformMatrix4fv(transform_loc, 1, GL_FALSE, (float *)matrix);
+          }
+
+          {
+            float matrix[4][4] = {
+              { 2.0 / (RIGHT - LEFT), 0, 0, 0 },
+              { 0, 2.0 / (TOP - BOTTOM), 0, 0 },
+              { 0, 0, 1, 0 },
+              { -(RIGHT + LEFT) / (RIGHT - LEFT), -(TOP + BOTTOM) / (TOP - BOTTOM), 0, 1 },
+            };
+            glUniformMatrix4fv(projection_loc, 1, GL_FALSE, (float *)matrix);
+          }
+
+          should_update_framebuffer = false;
+        }
+
       glBindVertexArray(quad_array);
       glUseProgram(program);
-      glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, GRID_QUAD_COUNT);
+      glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
       glfwSwapBuffers(window);
       glfwPollEvents();
