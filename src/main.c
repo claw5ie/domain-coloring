@@ -41,13 +41,50 @@ float RIGHT = 8.0;
 float BOTTOM = (-6.0);
 float TOP = 6.0;
 
-bool should_update_framebuffer = true;
+typedef struct GlfwContext GlfwContext;
+struct GlfwContext
+{
+  GLuint program;
+  GLint screen_loc;
+  GLint x_axis_loc;
+  GLint y_axis_loc;
+  GLint transform_loc;
+  GLint projection_loc;
+};
+
+void
+update_coordinate_system(GlfwContext *ctx)
+{
+  glUseProgram(ctx->program);
+
+  glUniform2f(ctx->screen_loc, SCREEN_WIDTH, SCREEN_HEIGHT);
+  glUniform2f(ctx->x_axis_loc, LEFT, BOTTOM);
+  glUniform2f(ctx->y_axis_loc, RIGHT, TOP);
+
+  {
+    float matrix[4][4] = {
+      { fabsf(RIGHT - LEFT), 0, 0, 0 },
+      { 0, fabsf(TOP - BOTTOM), 0, 0 },
+      { 0, 0, 1, 0 },
+      { LEFT, BOTTOM, 0, 1 },
+    };
+    glUniformMatrix4fv(ctx->transform_loc, 1, GL_FALSE, (float *)matrix);
+  }
+
+  {
+    float matrix[4][4] = {
+      { 2.0 / (RIGHT - LEFT), 0, 0, 0 },
+      { 0, 2.0 / (TOP - BOTTOM), 0, 0 },
+      { 0, 0, 1, 0 },
+      { -(RIGHT + LEFT) / (RIGHT - LEFT), -(TOP + BOTTOM) / (TOP - BOTTOM), 0, 1 },
+    };
+    glUniformMatrix4fv(ctx->projection_loc, 1, GL_FALSE, (float *)matrix);
+  }
+}
 
 void
 framebuffer_size_callback(GLFWwindow *window, int width, int height)
 {
-  (void)window;
-
   float scale = (RIGHT - LEFT) / (TOP - BOTTOM) * ((float)height / width);
   float offset = (TOP + BOTTOM) / 2;
 
@@ -63,7 +100,9 @@ framebuffer_size_callback(GLFWwindow *window, int width, int height)
 
   glViewport(0, 0, width, height);
 
-  should_update_framebuffer = true;
+  GlfwContext *ctx = glfwGetWindowUserPointer(window);
+  assert(ctx);
+  update_coordinate_system(ctx);
 }
 
 int
@@ -132,6 +171,19 @@ main(void)
   assert(transform_loc != -1);
   assert(projection_loc != -1);
 
+  GlfwContext ctx = {
+    .program = program,
+    .screen_loc = screen_loc,
+    .x_axis_loc = x_axis_loc,
+    .y_axis_loc = y_axis_loc,
+    .transform_loc = transform_loc,
+    .projection_loc = projection_loc,
+  };
+
+  glfwSetWindowUserPointer(window, &ctx);
+
+  update_coordinate_system(&ctx);
+
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   glEnable(GL_DEPTH_TEST);
@@ -178,37 +230,6 @@ main(void)
 
       if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
-
-      if (should_update_framebuffer)
-        {
-          glUseProgram(program);
-
-          glUniform2f(screen_loc, SCREEN_WIDTH, SCREEN_HEIGHT);
-          glUniform2f(x_axis_loc, LEFT, BOTTOM);
-          glUniform2f(y_axis_loc, RIGHT, TOP);
-
-          {
-            float matrix[4][4] = {
-              { fabsf(RIGHT - LEFT), 0, 0, 0 },
-              { 0, fabsf(TOP - BOTTOM), 0, 0 },
-              { 0, 0, 1, 0 },
-              { LEFT, BOTTOM, 0, 1 },
-            };
-            glUniformMatrix4fv(transform_loc, 1, GL_FALSE, (float *)matrix);
-          }
-
-          {
-            float matrix[4][4] = {
-              { 2.0 / (RIGHT - LEFT), 0, 0, 0 },
-              { 0, 2.0 / (TOP - BOTTOM), 0, 0 },
-              { 0, 0, 1, 0 },
-              { -(RIGHT + LEFT) / (RIGHT - LEFT), -(TOP + BOTTOM) / (TOP - BOTTOM), 0, 1 },
-            };
-            glUniformMatrix4fv(projection_loc, 1, GL_FALSE, (float *)matrix);
-          }
-
-          should_update_framebuffer = false;
-        }
 
       glBindVertexArray(quad_array);
       glUseProgram(program);
