@@ -67,12 +67,7 @@ transform(vec2 p)
 void
 main()
 {
-  vec2 pos = gl_FragCoord.xy;
-
-  pos /= screen;
-  pos *= y_axis - x_axis;
-  pos.y = -pos.y;
-  pos += vec2(x_axis.x, y_axis.y);
+  vec2 pos = gl_FragCoord.xy * (y_axis - x_axis) / screen + x_axis;
 
   frag_color = vec4(hl_color_model(transform(pos)), 1.0);
 }
