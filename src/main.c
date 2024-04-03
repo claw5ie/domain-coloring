@@ -179,6 +179,35 @@ cursor_pos_callback(GLFWwindow *window, double x, double y)
     }
 }
 
+void
+scroll_callback(GLFWwindow *window, double x, double y)
+{
+  (void)x;
+
+  y = y < 0 ? 1 / 0.85 : y > 0 ? 0.85 : 0;
+
+  GlfwContext *ctx = glfwGetWindowUserPointer(window);
+  assert(ctx);
+
+  float x_offset = 0, y_offset = 0;
+  get_cursor_pos(window, &x_offset, &y_offset);
+
+  g_left -= x_offset;
+  g_right -= x_offset;
+  g_bottom -= y_offset;
+  g_top -= y_offset;
+  g_left *= y;
+  g_right *= y;
+  g_bottom *= y;
+  g_top *= y;
+  g_left += x_offset;
+  g_right += x_offset;
+  g_bottom += y_offset;
+  g_top += y_offset;
+
+  update_coordinate_system(ctx, g_left, g_right, g_bottom, g_top);
+}
+
 int
 main(void)
 {
@@ -204,6 +233,7 @@ main(void)
   glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
   glfwSetMouseButtonCallback(window, mouse_button_callback);
   glfwSetCursorPosCallback(window, cursor_pos_callback);
+  glfwSetScrollCallback(window, scroll_callback);
 
   float quad[] = { 0, 0,
                    1, 0,
