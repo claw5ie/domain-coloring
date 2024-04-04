@@ -41,15 +41,24 @@ float g_right = 8.0;
 float g_bottom = (-6.0);
 float g_top = 6.0;
 
-typedef struct GlfwContext GlfwContext;
-struct GlfwContext
+struct QuadVertexArray
 {
+  GLuint vertex_array;
+  GLuint vertex_buffer;
+
   GLuint program;
+
   GLint screen_loc;
   GLint x_axis_loc;
   GLint y_axis_loc;
   GLint transform_loc;
   GLint projection_loc;
+};
+
+typedef struct GlfwContext GlfwContext;
+struct GlfwContext
+{
+  struct QuadVertexArray *quad;
 
   bool is_lmb_pressed;
 
@@ -60,31 +69,26 @@ struct GlfwContext
 void
 update_coordinate_system(GlfwContext *ctx, float left, float right, float bottom, float top)
 {
-  glUseProgram(ctx->program);
+  float transform[4][4] = {
+    { fabsf(right - left), 0, 0, 0 },
+    { 0, fabsf(top - bottom), 0, 0 },
+    { 0, 0, 1, 0 },
+    { left, bottom, 0, 1 },
+  };
+  float projection[4][4] = {
+    { 2.0 / (right - left), 0, 0, 0 },
+    { 0, 2.0 / (top - bottom), 0, 0 },
+    { 0, 0, 1, 0 },
+    { -(right + left) / (right - left), -(top + bottom) / (top - bottom), 0, 1 },
+  };
 
-  glUniform2f(ctx->screen_loc, g_screen_width, g_screen_height);
-  glUniform2f(ctx->x_axis_loc, left, bottom);
-  glUniform2f(ctx->y_axis_loc, right, top);
+  glUseProgram(ctx->quad->program);
 
-  {
-    float matrix[4][4] = {
-      { fabsf(right - left), 0, 0, 0 },
-      { 0, fabsf(top - bottom), 0, 0 },
-      { 0, 0, 1, 0 },
-      { left, bottom, 0, 1 },
-    };
-    glUniformMatrix4fv(ctx->transform_loc, 1, GL_FALSE, (float *)matrix);
-  }
-
-  {
-    float matrix[4][4] = {
-      { 2.0 / (right - left), 0, 0, 0 },
-      { 0, 2.0 / (top - bottom), 0, 0 },
-      { 0, 0, 1, 0 },
-      { -(right + left) / (right - left), -(top + bottom) / (top - bottom), 0, 1 },
-    };
-    glUniformMatrix4fv(ctx->projection_loc, 1, GL_FALSE, (float *)matrix);
-  }
+  glUniform2f(ctx->quad->screen_loc, g_screen_width, g_screen_height);
+  glUniform2f(ctx->quad->x_axis_loc, left, bottom);
+  glUniform2f(ctx->quad->y_axis_loc, right, top);
+  glUniformMatrix4fv(ctx->quad->transform_loc, 1, GL_FALSE, (float *)transform);
+  glUniformMatrix4fv(ctx->quad->projection_loc, 1, GL_FALSE, (float *)projection);
 }
 
 void
@@ -235,56 +239,56 @@ main(void)
   glfwSetCursorPosCallback(window, cursor_pos_callback);
   glfwSetScrollCallback(window, scroll_callback);
 
-  float quad[] = { 0, 0,
-                   1, 0,
-                   0, 1,
-                   1, 1 };
-
-  GLuint quad_array;
-  glCreateVertexArrays(1, &quad_array);
-
-  GLuint quad_buffer;
-  glCreateBuffers(1, &quad_buffer);
-  glBindBuffer(GL_ARRAY_BUFFER, quad_buffer);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
-
-  glBindVertexArray(quad_array);
-
-  glBindBuffer(GL_ARRAY_BUFFER, quad_buffer);
-  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void *)0);
-  glEnableVertexAttribArray(0);
-
-  GLuint program = 0;
+  struct QuadVertexArray quad = { 0 };
 
   {
-    GLuint vertex_shader = create_shader(GL_VERTEX_SHADER, "./shaders/default.vert");
-    GLuint fragment_shader = create_shader(GL_FRAGMENT_SHADER, "./shaders/default.frag");
-    program = create_program(vertex_shader, fragment_shader);
+    {
+      float data[] = { 0, 0,
+                       1, 0,
+                       0, 1,
+                       1, 1 };
 
-    glDeleteShader(vertex_shader);
-    glDeleteShader(fragment_shader);
+      glCreateBuffers(1, &quad.vertex_buffer);
+      glBindBuffer(GL_ARRAY_BUFFER, quad.vertex_buffer);
+      glBufferData(GL_ARRAY_BUFFER, sizeof(data), data, GL_STATIC_DRAW);
+
+      glCreateVertexArrays(1, &quad.vertex_array);
+      glBindVertexArray(quad.vertex_array);
+
+      glBindBuffer(GL_ARRAY_BUFFER, quad.vertex_buffer);
+      glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void *)0);
+      glEnableVertexAttribArray(0);
+    }
+
+    {
+      GLuint vertex_shader = create_shader(GL_VERTEX_SHADER, "./shaders/default.vert");
+      GLuint fragment_shader = create_shader(GL_FRAGMENT_SHADER, "./shaders/default.frag");
+      quad.program = create_program(vertex_shader, fragment_shader);
+
+      glDeleteShader(vertex_shader);
+      glDeleteShader(fragment_shader);
+    }
+
+    {
+      quad.screen_loc = glGetUniformLocation(quad.program, "screen");
+      quad.x_axis_loc = glGetUniformLocation(quad.program, "x_axis");
+      quad.y_axis_loc = glGetUniformLocation(quad.program, "y_axis");
+      quad.transform_loc = glGetUniformLocation(quad.program, "transform");
+      quad.projection_loc = glGetUniformLocation(quad.program, "projection");
+
+      assert(quad.screen_loc != -1);
+      assert(quad.x_axis_loc != -1);
+      assert(quad.y_axis_loc != -1);
+      assert(quad.transform_loc != -1);
+      assert(quad.projection_loc != -1);
+    }
   }
 
-  GLint screen_loc = glGetUniformLocation(program, "screen");
-  GLint x_axis_loc = glGetUniformLocation(program, "x_axis");
-  GLint y_axis_loc = glGetUniformLocation(program, "y_axis");
-  GLint transform_loc = glGetUniformLocation(program, "transform");
-  GLint projection_loc = glGetUniformLocation(program, "projection");
-
-  assert(screen_loc != -1);
-  assert(x_axis_loc != -1);
-  assert(y_axis_loc != -1);
-  assert(transform_loc != -1);
-  assert(projection_loc != -1);
-
   GlfwContext ctx = {
-    .program = program,
-    .screen_loc = screen_loc,
-    .x_axis_loc = x_axis_loc,
-    .y_axis_loc = y_axis_loc,
-    .transform_loc = transform_loc,
-    .projection_loc = projection_loc,
+    .quad = &quad,
     .is_lmb_pressed = false,
+    .x_mouse_pos = 0,
+    .y_mouse_pos = 0,
   };
 
   glfwSetWindowUserPointer(window, &ctx);
@@ -293,7 +297,6 @@ main(void)
 
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  glEnable(GL_DEPTH_TEST);
   glClearColor(1.0, 1.0, 1.0, 1.0);
 
   for (GLenum error; (error = glGetError()) != GL_NO_ERROR; )
@@ -338,8 +341,8 @@ main(void)
       if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 
-      glBindVertexArray(quad_array);
-      glUseProgram(program);
+      glBindVertexArray(quad.vertex_array);
+      glUseProgram(quad.program);
       glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
       glfwSwapBuffers(window);
