@@ -62,6 +62,13 @@ transform(vec2 p)
 {
   return vec2(sin(p.x * p.x - p.y * p.y), 2 * p.x * p.y);
   // return p;
+  // return p.x * vec2(p.x / p.y, p.y * p.x);
+  // return vec2(p.x / p.y, p.y * p.x);
+  // if (p.x + p.y < 0)
+  //   return vec2(-sqrt(-(p.x + p.y)), 2 * p.x * p.y);
+  // else
+  //   return vec2(sqrt(p.x + p.y), 2 * p.x * p.y);
+  // return vec2(p.x / p.y, p.y * p.x);
 }
 
 void
