@@ -92,7 +92,7 @@ update_coordinate_system(GlfwContext *ctx, float left, float right, float bottom
 }
 
 void
-to_local_coordinates(float x, float y, float *x_dst, float *y_dst)
+to_local_coordinates(float *x_dst, float *y_dst, float x, float y)
 {
   float xx = x * (g_right - g_left) / g_screen_width;
   xx += g_left;
@@ -108,7 +108,7 @@ get_cursor_pos(GLFWwindow *window, float *x_dst, float *y_dst)
 {
   double x, y;
   glfwGetCursorPos(window, &x, &y);
-  to_local_coordinates(x, y, x_dst, y_dst);
+  to_local_coordinates(x_dst, y_dst, x, y);
 }
 
 void
@@ -175,7 +175,7 @@ cursor_pos_callback(GLFWwindow *window, double x, double y)
   if (ctx->is_lmb_pressed)
     {
       float x_offset = 0, y_offset = 0;
-      to_local_coordinates(x, y, &x_offset, &y_offset);
+      to_local_coordinates(&x_offset, &y_offset, x, y);
       x_offset -= ctx->x_mouse_pos;
       y_offset -= ctx->y_mouse_pos;
 
@@ -200,10 +200,12 @@ scroll_callback(GLFWwindow *window, double x, double y)
   g_right -= x_offset;
   g_bottom -= y_offset;
   g_top -= y_offset;
+
   g_left *= y;
   g_right *= y;
   g_bottom *= y;
   g_top *= y;
+
   g_left += x_offset;
   g_right += x_offset;
   g_bottom += y_offset;
